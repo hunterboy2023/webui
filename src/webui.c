@@ -11604,12 +11604,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpReserved) {
             SetEnvironmentVariable("WEBVIEW2_DEFAULT_BACKGROUND_COLOR", "0");
         }
         
-        SetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", 
-            "--use-fake-ui-for-media-stream "
-            "--enable-features=WebUSB,WebBluetooth,WebSerial,PushMessaging,NativeFileSystemAPI,ScreenCapture");
-            
-        // 确保IndexedDB持久化
-        SetEnvironmentVariable("WEBVIEW2_USER_DATA_STORAGE", "1");
+        SetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--auto-accept-camera-and-microphone-capture");
 
         // WebView Dynamic Library
         if (!_webui.webviewLib) {
