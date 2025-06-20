@@ -11604,7 +11604,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpReserved) {
             SetEnvironmentVariable("WEBVIEW2_DEFAULT_BACKGROUND_COLOR", "0");
         }
         
-        SetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--disable-web-security;--use-angle=d3d9;--auto-accept-camera-and-microphone-capture");
+        SetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--disable-web-security --use-angle=d3d9 --auto-accept-camera-and-microphone-capture");
 
         // WebView Dynamic Library
         if (!_webui.webviewLib) {
