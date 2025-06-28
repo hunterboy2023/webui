@@ -11322,6 +11322,95 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpReserved) {
         }
         return handler->refCount;
     };
+    
+void simulate_click_on_webview2(HWND hwnd)
+{
+    if (hwnd == NULL)
+    {
+        fprintf(stderr, "Error: Could not get window handle for WebView2.\n");
+        return;
+    }
+
+    // 第一步：获取并保存当前鼠标位置
+    POINT originalPoint;
+    if (!GetCursorPos(&originalPoint))
+    {
+        fprintf(stderr, "Error: Could not get current cursor position. GetLastError: %lu\n", GetLastError());
+        return;
+    }
+
+    // 获取窗体的客户区矩形
+    RECT clientRect;
+
+    if (!GetClientRect(hwnd, &clientRect))
+    {
+        fprintf(stderr, "Error: Could not get client rect for WebView2 window. GetLastError: %lu\n", GetLastError());
+        return;
+    }
+
+    // 计算点击位置（例如：客户区中心）
+    POINT clickPoint =
+    {
+        .x = clientRect.right / 2,
+        .y = clientRect.bottom / 2
+    };
+
+    // 将客户区坐标转换为屏幕坐标
+    if (!ClientToScreen(hwnd, &clickPoint))
+    {
+        fprintf(stderr, "Error: Could not convert client coordinates to screen coordinates. GetLastError: %lu\n", GetLastError());
+        return;
+    }
+
+    // 获取屏幕尺寸，用于将像素坐标转换为 SendInput 的归一化绝对坐标
+    int screen_width = GetSystemMetrics(SM_CXSCREEN);
+    int screen_height = GetSystemMetrics(SM_CYSCREEN);
+
+    // 将屏幕像素坐标转换为 SendInput 使用的归一化绝对坐标 (0-65535)
+    long absoluteX = (clickPoint.x * 65535) / screen_width;
+    long absoluteY = (clickPoint.y * 65535) / screen_height;
+
+    // 构造 INPUT 结构体数组：移动鼠标到目标位置→按下→抬起→恢复原位置
+    INPUT inputs[4] = {0};
+
+    // 1. 移动鼠标到目标位置
+    inputs[0].type = INPUT_MOUSE;
+    inputs[0].mi.dx = absoluteX;
+    inputs[0].mi.dy = absoluteY;
+    inputs[0].mi.dwFlags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE;
+
+    // 2. 鼠标按下
+    inputs[1].type = INPUT_MOUSE;
+    inputs[1].mi.dx = absoluteX;
+    inputs[1].mi.dy = absoluteY;
+    inputs[1].mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
+
+    // 3. 鼠标抬起
+    inputs[2].type = INPUT_MOUSE;
+    inputs[2].mi.dx = absoluteX;
+    inputs[2].mi.dy = absoluteY;
+    inputs[2].mi.dwFlags = MOUSEEVENTF_LEFTUP;
+
+    // 4. 恢复鼠标到原来位置
+    inputs[3].type = INPUT_MOUSE;
+    inputs[3].mi.dx = (originalPoint.x * 65535) / screen_width;
+    inputs[3].mi.dy = (originalPoint.y * 65535) / screen_height;
+    inputs[3].mi.dwFlags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE;
+
+    // 发送输入事件
+    UINT sent = SendInput(ARRAYSIZE(inputs), inputs, sizeof(INPUT));
+
+    if (sent != ARRAYSIZE(inputs))
+    {
+        fprintf(stderr, "Error: SendInput failed. Sent %u of %zu inputs. GetLastError: %lu\n", 
+               sent, ARRAYSIZE(inputs), GetLastError());
+    }
+    else
+    {
+        printf("Simulated click at screen coordinates: (%ld, %ld) and restored cursor position\n", 
+              absoluteX, absoluteY);
+    }
+}
 
     LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 
@@ -11337,6 +11426,19 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpReserved) {
         _webui_window_t* win = _webui_dereference_win_ptr(ptr);
 
         switch (uMsg) {
+            case WM_ACTIVATE:
+                printf("activate webview2 host\r\n");
+                if (win && win->webView && win->webView->webviewController) {
+                    if (LOWORD(wParam) != WA_INACTIVE) {  // 检查是否处于激活状态
+                        win->webView->webviewController->lpVtbl->MoveFocus(
+                            win->webView->webviewController, 
+                            COREWEBVIEW2_MOVE_FOCUS_REASON_PROGRAMMATIC
+                        );
+                        printf("activate webview2\r\n");
+                        simulate_click_on_webview2(hwnd);
+                    }
+                }
+                break;
             case WM_CREATE: {
                 if (win) {
                     if (win->transparent) {
