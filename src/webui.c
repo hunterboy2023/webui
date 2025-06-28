@@ -11506,6 +11506,8 @@ void simulate_click_on_webview2(HWND hwnd)
                     }                    
                     _webui_wv_event_closed(win);
                 }
+                //cv add here! for timeout(0)
+                webui_exit();
                 break;
             }
             case WM_DESTROY: {
