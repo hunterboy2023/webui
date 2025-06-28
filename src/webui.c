@@ -11430,12 +11430,16 @@ void simulate_click_on_webview2(HWND hwnd)
                 printf("activate webview2 host\r\n");
                 if (win && win->webView && win->webView->webviewController) {
                     if (LOWORD(wParam) != WA_INACTIVE) {  // 检查是否处于激活状态
-                        win->webView->webviewController->lpVtbl->MoveFocus(
-                            win->webView->webviewController, 
-                            COREWEBVIEW2_MOVE_FOCUS_REASON_PROGRAMMATIC
-                        );
-                        printf("activate webview2\r\n");
-                        simulate_click_on_webview2(hwnd);
+                        if ((GetAsyncKeyState(VK_LBUTTON) & 0x8000) == 0) {  // 鼠标左键未按下
+                            win->webView->webviewController->lpVtbl->MoveFocus(
+                                win->webView->webviewController, 
+                                COREWEBVIEW2_MOVE_FOCUS_REASON_PROGRAMMATIC
+                            );
+                            printf("activate webview2\r\n");
+                            simulate_click_on_webview2(hwnd);
+                        } else {
+                            printf("mouse left button is pressed, skipping focus and click simulation\r\n");
+                        }
                     }
                 }
                 break;
