@@ -11712,7 +11712,7 @@ void simulate_click_on_webview2(HWND hwnd)
             SetEnvironmentVariable("WEBVIEW2_DEFAULT_BACKGROUND_COLOR", "0");
         }
         
-        SetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--auto-open-devtools-for-tabs --disable-web-security --use-angle=d3d9 --auto-accept-camera-and-microphone-capture");
+        SetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--auto-open-devtools-for-tabs --disable-web-security --use-angle=d3d9 --auto-accept-camera-and-microphone-capture --allow-file-access-from-files --allow-file-access");
 
         // WebView Dynamic Library
         if (!_webui.webviewLib) {
