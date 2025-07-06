@@ -11351,8 +11351,8 @@ void simulate_click_on_webview2(HWND hwnd)
     // 计算点击位置（例如：客户区中心）
     POINT clickPoint =
     {
-        .x = clientRect.right / 2,
-        .y = clientRect.bottom / 2
+        .x = 1,
+        .y = 1
     };
 
     // 将客户区坐标转换为屏幕坐标
