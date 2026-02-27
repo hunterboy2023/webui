@@ -15,7 +15,8 @@
       "Bash(objdump:*)",
       "Bash(ar:*)",
       "Bash(rm:*)",
-      "Bash(ar rc:*)"
+      "Bash(ar rc:*)",
+      "Bash(ls:*)"
     ]
   }
 }

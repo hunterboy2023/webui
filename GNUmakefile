@@ -47,10 +47,13 @@ ARCH_TARGET ?=
 # BUILD FLAGS
 CIVETWEB_BUILD_FLAGS := -o civetweb.o -I"$(MAKEFILE_DIR)/include/" -c "$(MAKEFILE_DIR)/src/civetweb/civetweb.c" -I"$(WEBUI_TLS_INCLUDE)" $(TLS_CFLAG) -w
 CIVETWEB_BUILD_FLAGS_DEVTOOLS := -o civetweb_devtools.o -I"$(MAKEFILE_DIR)/include/" -c "$(MAKEFILE_DIR)/src/civetweb/civetweb.c" -I"$(WEBUI_TLS_INCLUDE)" $(TLS_CFLAG) -w
+CIVETWEB_BUILD_FLAGS_D3D12 := -o civetweb_d3d12.o -I"$(MAKEFILE_DIR)/include/" -c "$(MAKEFILE_DIR)/src/civetweb/civetweb.c" -I"$(WEBUI_TLS_INCLUDE)" $(TLS_CFLAG) -w
 CIVETWEB_DEFINE_FLAGS = -DNDEBUG -DNO_CACHING -DNO_CGI -DUSE_WEBSOCKET $(TLS_CFLAG)
 CIVETWEB_DEFINE_FLAGS_DEVTOOLS = -DNDEBUG -DNO_CACHING -DNO_CGI -DUSE_WEBSOCKET -DWEBUI_AUTO_OPEN_DEVTOOLS $(TLS_CFLAG)
+CIVETWEB_DEFINE_FLAGS_D3D12 = -DNDEBUG -DNO_CACHING -DNO_CGI -DUSE_WEBSOCKET -DWEBUI_NO_ANGLE_D3D9 $(TLS_CFLAG)
 WEBUI_BUILD_FLAGS := -o webui.o -I"$(MAKEFILE_DIR)/include/" -c "$(MAKEFILE_DIR)/src/webui.c" -I"$(WEBUI_TLS_INCLUDE)" $(TLS_CFLAG)
 WEBUI_BUILD_FLAGS_DEVTOOLS := -o webui_devtools.o -I"$(MAKEFILE_DIR)/include/" -c "$(MAKEFILE_DIR)/src/webui.c" -I"$(WEBUI_TLS_INCLUDE)" $(TLS_CFLAG) -DWEBUI_AUTO_OPEN_DEVTOOLS
+WEBUI_BUILD_FLAGS_D3D12 := -o webui_d3d12.o -I"$(MAKEFILE_DIR)/include/" -c "$(MAKEFILE_DIR)/src/webui.c" -I"$(WEBUI_TLS_INCLUDE)" $(TLS_CFLAG) -DWEBUI_NO_ANGLE_D3D9
 WARNING_RELEASE := -w
 WARNING_LOG := -Wall -Wno-unused
 
@@ -59,6 +62,7 @@ WARNING_LOG := -Wall -Wno-unused
 # The dynamic output is platform dependent
 LIB_STATIC_OUT := lib$(WEBUI_OUT_LIB_NAME)-static.a
 LIB_STATIC_DEBUG_OUT := lib$(WEBUI_OUT_LIB_NAME)-static_d.a
+LIB_STATIC_D3D12_OUT := lib$(WEBUI_OUT_LIB_NAME)-static_d3d12.a
 
 # Platform defaults and dynamic library outputs
 ifeq ($(DETECTED_OS),Windows)
@@ -171,6 +175,13 @@ endif
 	&& $(CC) $(TARGET) $(WEBUI_BUILD_FLAGS_DEVTOOLS) $(WARNING_RELEASE) -Os \
 	&& $(LLVM_OPT)ar rc $(LIB_STATIC_DEBUG_OUT) webui_devtools.o civetweb_devtools.o $(WEBKIT_OBJ) \
 	&& $(LLVM_OPT)ranlib $(LIB_STATIC_DEBUG_OUT)
+#	Static Release D3D12 (No angle=d3d9)
+	@cd "$(BUILD_DIR)" \
+	&& echo "Build WebUI library ($(CC) $(TARGET) release static d3d12)..." \
+	&& $(CC) $(TARGET) $(CIVETWEB_BUILD_FLAGS_D3D12) $(CIVETWEB_DEFINE_FLAGS_D3D12) -Os \
+	&& $(CC) $(TARGET) $(WEBUI_BUILD_FLAGS_D3D12) $(WARNING_RELEASE) -Os \
+	&& $(LLVM_OPT)ar rc $(LIB_STATIC_D3D12_OUT) webui_d3d12.o civetweb_d3d12.o $(WEBKIT_OBJ) \
+	&& $(LLVM_OPT)ranlib $(LIB_STATIC_D3D12_OUT)
 #	Dynamic Release
 	@cd "$(BUILD_DIR)" \
 	&& echo "Build WebUI library ($(CC) $(TARGET) release dynamic)..." \

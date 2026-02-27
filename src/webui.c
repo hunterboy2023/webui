@@ -11712,10 +11712,18 @@ void simulate_click_on_webview2(HWND hwnd)
             SetEnvironmentVariable("WEBVIEW2_DEFAULT_BACKGROUND_COLOR", "0");
         }
 
-        #ifdef WEBUI_AUTO_OPEN_DEVTOOLS
-        SetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--auto-open-devtools-for-tabs --disable-web-security --use-angle=d3d9 --auto-accept-camera-and-microphone-capture --allow-file-access-from-files --allow-file-access");
+        #ifndef WEBUI_NO_ANGLE_D3D9
+            #ifdef WEBUI_AUTO_OPEN_DEVTOOLS
+            SetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--auto-open-devtools-for-tabs --disable-web-security --use-angle=d3d9 --auto-accept-camera-and-microphone-capture --allow-file-access-from-files --allow-file-access");
+            #else
+            SetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--disable-web-security --use-angle=d3d9 --auto-accept-camera-and-microphone-capture --allow-file-access-from-files --allow-file-access");
+            #endif
         #else
-        SetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--disable-web-security --use-angle=d3d9 --auto-accept-camera-and-microphone-capture --allow-file-access-from-files --allow-file-access");
+            #ifdef WEBUI_AUTO_OPEN_DEVTOOLS
+            SetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--auto-open-devtools-for-tabs --disable-web-security --auto-accept-camera-and-microphone-capture --allow-file-access-from-files --allow-file-access");
+            #else
+            SetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--disable-web-security --auto-accept-camera-and-microphone-capture --allow-file-access-from-files --allow-file-access");
+            #endif
         #endif
 
         // WebView Dynamic Library
