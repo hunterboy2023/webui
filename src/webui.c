@@ -11714,15 +11714,15 @@ void simulate_click_on_webview2(HWND hwnd)
 
         #ifndef WEBUI_NO_ANGLE_D3D9
             #ifdef WEBUI_AUTO_OPEN_DEVTOOLS
-            SetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--auto-open-devtools-for-tabs --disable-web-security --use-angle=d3d9 --auto-accept-camera-and-microphone-capture --allow-file-access-from-files --allow-file-access");
+            SetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--auto-open-devtools-for-tabs --disable-web-security --use-angle=d3d9 --auto-accept-camera-and-microphone-capture --allow-file-access-from-files --allow-file-access --no-sandbox --disable-gpu-vsync --disable-features=CalculateNativeWinOcclusion");
             #else
-            SetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--disable-web-security --use-angle=d3d9 --auto-accept-camera-and-microphone-capture --allow-file-access-from-files --allow-file-access");
+            SetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--disable-web-security --use-angle=d3d9 --auto-accept-camera-and-microphone-capture --allow-file-access-from-files --allow-file-access --no-sandbox --disable-gpu-vsync --disable-features=CalculateNativeWinOcclusion");
             #endif
         #else
             #ifdef WEBUI_AUTO_OPEN_DEVTOOLS
-            SetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--auto-open-devtools-for-tabs --disable-web-security --auto-accept-camera-and-microphone-capture --allow-file-access-from-files --allow-file-access");
+            SetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--auto-open-devtools-for-tabs --disable-web-security --auto-accept-camera-and-microphone-capture --allow-file-access-from-files --allow-file-access --no-sandbox --disable-gpu-vsync --disable-features=CalculateNativeWinOcclusion");
             #else
-            SetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--disable-web-security --auto-accept-camera-and-microphone-capture --allow-file-access-from-files --allow-file-access");
+            SetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--disable-web-security --auto-accept-camera-and-microphone-capture --allow-file-access-from-files --allow-file-access --no-sandbox --disable-gpu-vsync --disable-features=CalculateNativeWinOcclusion");
             #endif
         #endif
 

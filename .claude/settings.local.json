@@ -16,7 +16,9 @@
       "Bash(ar:*)",
       "Bash(rm:*)",
       "Bash(ar rc:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "WebFetch(domain:github.com)",
+      "WebSearch"
     ]
   }
 }
