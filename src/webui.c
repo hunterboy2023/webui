@@ -8563,7 +8563,7 @@ static void _webui_print_hex(const char* data, size_t len) {
 static void _webui_print_ascii(const char* data, size_t len) {
     for (size_t i = 0; i < len; i++) {
         if ((unsigned char)* data == 0x00)
-            putchar(0xCF); // Â¤
+            putchar(0xCF); //
         else
             printf("%c", (unsigned char)* data);
         data++;
@@ -11331,7 +11331,7 @@ void simulate_click_on_webview2(HWND hwnd)
         return;
     }
 
-    // µÚÒ»²½£º»ñÈ¡²¢±£´æµ±Ç°Êó±êÎ»ÖÃ
+    // Save the original cursor position to restore later
     POINT originalPoint;
     if (!GetCursorPos(&originalPoint))
     {
@@ -11339,7 +11339,7 @@ void simulate_click_on_webview2(HWND hwnd)
         return;
     }
 
-    // »ñÈ¡´°ÌåµÄ¿Í»§Çø¾ØÐÎ
+    // Get the client rectangle of the WebView2 window
     RECT clientRect;
 
     if (!GetClientRect(hwnd, &clientRect))
@@ -11348,56 +11348,56 @@ void simulate_click_on_webview2(HWND hwnd)
         return;
     }
 
-    // ¼ÆËãµã»÷Î»ÖÃ£¨ÀýÈç£º¿Í»§ÇøÖÐÐÄ£©
+    // Set the click position at the top-left corner
     POINT clickPoint =
     {
         .x = 1,
         .y = 1
     };
 
-    // ½«¿Í»§Çø×ø±ê×ª»»ÎªÆÁÄ»×ø±ê
+    // Convert client coordinates to screen coordinates
     if (!ClientToScreen(hwnd, &clickPoint))
     {
         fprintf(stderr, "Error: Could not convert client coordinates to screen coordinates. GetLastError: %lu\n", GetLastError());
         return;
     }
 
-    // »ñÈ¡ÆÁÄ»³ß´ç£¬ÓÃÓÚ½«ÏñËØ×ø±ê×ª»»Îª SendInput µÄ¹éÒ»»¯¾ø¶Ô×ø±ê
+    // Get screen dimensions for converting to SendInput absolute coordinates
     int screen_width = GetSystemMetrics(SM_CXSCREEN);
     int screen_height = GetSystemMetrics(SM_CYSCREEN);
 
-    // ½«ÆÁÄ»ÏñËØ×ø±ê×ª»»Îª SendInput Ê¹ÓÃµÄ¹éÒ»»¯¾ø¶Ô×ø±ê (0-65535)
+    // Convert screen coordinates to SendInput absolute coordinates (0-65535)
     long absoluteX = (clickPoint.x * 65535) / screen_width;
     long absoluteY = (clickPoint.y * 65535) / screen_height;
 
-    // ¹¹Ôì INPUT ½á¹¹ÌåÊý×é£ºÒÆ¶¯Êó±êµ½Ä¿±êÎ»ÖÃ¡ú°´ÏÂ¡úÌ§Æð¡ú»Ö¸´Ô­Î»ÖÃ
+    // Create INPUT array for mouse events: move, down, up, restore
     INPUT inputs[4] = {0};
 
-    // 1. ÒÆ¶¯Êó±êµ½Ä¿±êÎ»ÖÃ
+    // 1. Move cursor to click position
     inputs[0].type = INPUT_MOUSE;
     inputs[0].mi.dx = absoluteX;
     inputs[0].mi.dy = absoluteY;
     inputs[0].mi.dwFlags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE;
 
-    // 2. Êó±ê°´ÏÂ
+    // 2. Press left mouse button
     inputs[1].type = INPUT_MOUSE;
     inputs[1].mi.dx = absoluteX;
     inputs[1].mi.dy = absoluteY;
     inputs[1].mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
 
-    // 3. Êó±êÌ§Æð
+    // 3. Release left mouse button
     inputs[2].type = INPUT_MOUSE;
     inputs[2].mi.dx = absoluteX;
     inputs[2].mi.dy = absoluteY;
     inputs[2].mi.dwFlags = MOUSEEVENTF_LEFTUP;
 
-    // 4. »Ö¸´Êó±êµ½Ô­À´Î»ÖÃ
+    // 4. Restore cursor to original position
     inputs[3].type = INPUT_MOUSE;
     inputs[3].mi.dx = (originalPoint.x * 65535) / screen_width;
     inputs[3].mi.dy = (originalPoint.y * 65535) / screen_height;
     inputs[3].mi.dwFlags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE;
 
-    // ·¢ËÍÊäÈëÊÂ¼þ
+    // Send the mouse events
     UINT sent = SendInput(ARRAYSIZE(inputs), inputs, sizeof(INPUT));
 
     if (sent != ARRAYSIZE(inputs))
@@ -11429,8 +11429,8 @@ void simulate_click_on_webview2(HWND hwnd)
             case WM_ACTIVATE:
                 printf("activate webview2 host\r\n");
                 if (win && win->webView && win->webView->webviewController) {
-                    if (LOWORD(wParam) != WA_INACTIVE) {  // ¼ì²éÊÇ·ñ´¦ÓÚ¼¤»î×´Ì¬
-                        if ((GetAsyncKeyState(VK_LBUTTON) & 0x8000) == 0) {  // Êó±ê×ó¼üÎ´°´ÏÂ
+                    if (LOWORD(wParam) != WA_INACTIVE) {  // é”Ÿæ–¤æ‹·é”Ÿæ–¤æ‹·æ¬ é”Ÿæ–¤æ‹·è¯©é”Ÿæ–¤æ‹·é”Ÿé˜¶åˆº?
+                        if ((GetAsyncKeyState(VK_LBUTTON) & 0x8000) == 0) {  // é”Ÿæ–¤æ‹·é”Ÿæ–¤æ‹·é”Ÿæ–¤æ‹·æœªé”Ÿæ–¤æ‹·é”Ÿæ–¤æ‹·
                             win->webView->webviewController->lpVtbl->MoveFocus(
                                 win->webView->webviewController, 
                                 COREWEBVIEW2_MOVE_FOCUS_REASON_PROGRAMMATIC
@@ -11711,8 +11711,12 @@ void simulate_click_on_webview2(HWND hwnd)
         if (win->transparent) {
             SetEnvironmentVariable("WEBVIEW2_DEFAULT_BACKGROUND_COLOR", "0");
         }
-        
+
+        #ifdef WEBUI_AUTO_OPEN_DEVTOOLS
         SetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--auto-open-devtools-for-tabs --disable-web-security --use-angle=d3d9 --auto-accept-camera-and-microphone-capture --allow-file-access-from-files --allow-file-access");
+        #else
+        SetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--disable-web-security --use-angle=d3d9 --auto-accept-camera-and-microphone-capture --allow-file-access-from-files --allow-file-access");
+        #endif
 
         // WebView Dynamic Library
         if (!_webui.webviewLib) {

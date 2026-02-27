@@ -52,6 +52,10 @@ class WebuiBridge {
 	#sendQueue: Uint8Array[] = [];
 	#isSending: boolean = false;
 	#bindsList: string[];
+	#reconnectAttempts: number = 0;
+	#maxReconnectAttempts: number = 5;
+	#startupTimeout: number;
+	#isStarting: boolean = true;
 	// WebUI Const
 	#WEBUI_SIGNATURE: number = 221;
 	#CMD_JS: number = 254;
@@ -208,11 +212,14 @@ class WebuiBridge {
 		onbeforeunload = () => {
 			this.#close();
 		};
-		setTimeout(() => {
-			if (!this.#wsWasConnected) {
-				alert('Sorry. WebUI failed to connect to the backend application. Please try again.');
+		// Improved startup timeout with better error handling
+		clearTimeout(this.#startupTimeout);
+		this.#startupTimeout = setTimeout(() => {
+			if (this.#isStarting && !this.#wsWasConnected) {
+				this.#isStarting = false;
+				this.#showConnectionError('WebUI failed to connect to the backend. Please check that the application is running and try refreshing the page.');
 			}
-		}, 1500);
+		}, 3000); // Increased from 1500ms to 3000ms for better reliability
 	}
 	// Methods
 	#close(reason = 0, value = '') {
@@ -242,7 +249,7 @@ class WebuiBridge {
 					zIndex: '1000',
 					lineHeight: '1'
 				});
-				div.innerText = 'WebUI Error: Connection with the backend is lost.';
+				div.innerText = 'WebUI Error: Connection with the backend is lost. Attempting to reconnect...';
 				document.body.insertBefore(div, document.body.firstChild);
 			}
 		}, 1000);
@@ -252,6 +259,37 @@ class WebuiBridge {
 		if (div) {
 			div.remove();
 		}
+	}
+	#showConnectionError(message: string) {
+		if (document.getElementById('webui-error-fatal')) return;
+		const div = document.createElement('div');
+		div.id = 'webui-error-fatal';
+		Object.assign(div.style, {
+			position: 'fixed',
+			top: '0',
+			left: '0',
+			width: '100%',
+			height: '100%',
+			backgroundColor: 'rgba(0, 0, 0, 0.8)',
+			color: '#fff',
+			textAlign: 'center',
+			padding: '20px',
+			fontFamily: 'Arial, sans-serif',
+			fontSize: '16px',
+			zIndex: '9999',
+			display: 'flex',
+			flexDirection: 'column',
+			justifyContent: 'center',
+			alignItems: 'center'
+		});
+		div.innerHTML = `
+			<div style="max-width: 600px; background: #333; padding: 30px; border-radius: 10px;">
+				<h2 style="color: #ff4d4d; margin-bottom: 20px;">WebUI Connection Error</h2>
+				<p>${message}</p>
+				<button onclick="location.reload()" style="margin-top: 20px; padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer;">Refresh Page</button>
+			</div>
+		`;
+		document.body.appendChild(div);
 	}
 	#isTextBasedCommand(cmd: number): Boolean {
 		if (cmd !== this.#CMD_SEND_RAW) return true;
@@ -620,12 +658,15 @@ class WebuiBridge {
 	}
 	#wsOnOpen = (event: Event) => {
 		this.#wsWasConnected = true;
+		this.#isStarting = false;
+		this.#reconnectAttempts = 0;
 		this.#unfreezeUI();
 		if (this.#log) console.log('WebUI -> Connected');
 		this.#checkToken();
 	};
 	#wsOnError = (event: Event) => {
 		if (this.#log) console.log(`WebUI -> Connection failed.`);
+		this.#isStarting = false;
 	};
 	#wsOnClose = (event: CloseEvent) => {
 		if (this.#closeReason === this.#CMD_NAVIGATION) {
@@ -635,10 +676,19 @@ class WebuiBridge {
 			globalThis.location.replace(this.#closeValue);
 		} else {
 			if (this.#wsStayAlive) {
-				// Re-connect
-				if (this.#log) console.log(`WebUI -> Connection lost (${event.code}). Reconnecting...`);
-				this.#freezeUi();
-				setTimeout(() => this.#wsConnect(), this.#wsStayAliveTimeout);
+				// Re-connect with exponential backoff
+				if (this.#reconnectAttempts < this.#maxReconnectAttempts) {
+					this.#reconnectAttempts++;
+					const backoffTime = this.#wsStayAliveTimeout * Math.pow(2, this.#reconnectAttempts - 1);
+					if (this.#log) console.log(`WebUI -> Connection lost (${event.code}). Reconnection attempt ${this.#reconnectAttempts}/${this.#maxReconnectAttempts} in ${backoffTime}ms...`);
+					this.#freezeUi();
+					setTimeout(() => this.#wsConnect(), Math.min(backoffTime, 10000)); // Max 10 seconds backoff
+				} else {
+					// Max reconnection attempts reached
+					if (this.#log) console.log(`WebUI -> Connection lost (${event.code}). Max reconnection attempts reached.`);
+					this.#showConnectionError('Lost connection to the backend after multiple reconnection attempts. Please refresh the page to try again.');
+					this.#wsStayAlive = false;
+				}
 			}
 			else if (this.#log) {
 				// Debug close
@@ -679,10 +729,20 @@ class WebuiBridge {
 						let FunReturn = 'undefined';
 						let FunError = false;
 						try {
-							FunReturn = await AsyncFunction(scriptSanitize)();
+							// Add try-catch inside the async function to catch any runtime errors
+							const safeScript = `
+								try {
+									return (${scriptSanitize})();
+								} catch (e) {
+									return e.toString();
+								}
+							`;
+							FunReturn = await AsyncFunction(safeScript)();
 						} catch (e) {
 							FunError = true;
 							FunReturn = e.message;
+							// Log the error for debugging
+							if (this.#log) console.error(`WebUI -> Script execution error:`, e);
 						}
 						// Stop if this is a quick call
 						if (buffer8[this.#PROTOCOL_CMD] === this.#CMD_JS_QUICK) return;
@@ -834,11 +894,21 @@ class WebuiBridge {
 						}
 					}
 					else {
-						if (this.#log) console.log(`WebUI -> CMD -> Token [${tokenHex}] Not Accepted. Reload page...`);
-						// Refresh the page to get a new token
-						this.#allowNavigation = true;
-						this.#wsStayAlive = false;
-						globalThis.location.reload();
+						if (this.#log) console.log(`WebUI -> CMD -> Token [${tokenHex}] Not Accepted.`);
+						// Instead of immediate reload, try to reconnect with backoff
+						if (this.#reconnectAttempts < this.#maxReconnectAttempts) {
+							this.#reconnectAttempts++;
+							if (this.#log) console.log(`WebUI -> Token rejected. Reconnection attempt ${this.#reconnectAttempts}/${this.#maxReconnectAttempts}`);
+							this.#allowNavigation = true;
+							setTimeout(() => {
+								this.#allowNavigation = false;
+								this.#wsConnect();
+							}, this.#wsStayAliveTimeout * this.#reconnectAttempts);
+						} else {
+							if (this.#log) console.log(`WebUI -> Token rejected. Max reconnection attempts reached. Showing error.`);
+							this.#wsStayAlive = false;
+							this.#showConnectionError('Failed to authenticate with the backend after multiple attempts. Please refresh the page to try again.');
+						}
 					}
 					break;
 			}

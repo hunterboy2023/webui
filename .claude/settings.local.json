@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run:*)",
+      "Bash(cmd.exe:*)",
+      "Bash(.node_modules.binesbuild:*)",
+      "Bash(node:*)",
+      "Bash(./main.exe:*)",
+      "Bash(where cl:*)",
+      "Bash(make release:*)",
+      "Bash(nm:*)",
+      "Bash(make:*)",
+      "Bash(md5sum:*)",
+      "Bash(gcc:*)",
+      "Bash(objdump:*)",
+      "Bash(ar:*)",
+      "Bash(rm:*)",
+      "Bash(ar rc:*)"
+    ]
+  }
+}

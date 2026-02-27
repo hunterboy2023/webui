@@ -46,8 +46,11 @@ ARCH_TARGET ?=
 
 # BUILD FLAGS
 CIVETWEB_BUILD_FLAGS := -o civetweb.o -I"$(MAKEFILE_DIR)/include/" -c "$(MAKEFILE_DIR)/src/civetweb/civetweb.c" -I"$(WEBUI_TLS_INCLUDE)" $(TLS_CFLAG) -w
+CIVETWEB_BUILD_FLAGS_DEVTOOLS := -o civetweb_devtools.o -I"$(MAKEFILE_DIR)/include/" -c "$(MAKEFILE_DIR)/src/civetweb/civetweb.c" -I"$(WEBUI_TLS_INCLUDE)" $(TLS_CFLAG) -w
 CIVETWEB_DEFINE_FLAGS = -DNDEBUG -DNO_CACHING -DNO_CGI -DUSE_WEBSOCKET $(TLS_CFLAG)
+CIVETWEB_DEFINE_FLAGS_DEVTOOLS = -DNDEBUG -DNO_CACHING -DNO_CGI -DUSE_WEBSOCKET -DWEBUI_AUTO_OPEN_DEVTOOLS $(TLS_CFLAG)
 WEBUI_BUILD_FLAGS := -o webui.o -I"$(MAKEFILE_DIR)/include/" -c "$(MAKEFILE_DIR)/src/webui.c" -I"$(WEBUI_TLS_INCLUDE)" $(TLS_CFLAG)
+WEBUI_BUILD_FLAGS_DEVTOOLS := -o webui_devtools.o -I"$(MAKEFILE_DIR)/include/" -c "$(MAKEFILE_DIR)/src/webui.c" -I"$(WEBUI_TLS_INCLUDE)" $(TLS_CFLAG) -DWEBUI_AUTO_OPEN_DEVTOOLS
 WARNING_RELEASE := -w
 WARNING_LOG := -Wall -Wno-unused
 
@@ -55,6 +58,7 @@ WARNING_LOG := -Wall -Wno-unused
 # The static output is the same for all platforms
 # The dynamic output is platform dependent
 LIB_STATIC_OUT := lib$(WEBUI_OUT_LIB_NAME)-static.a
+LIB_STATIC_DEBUG_OUT := lib$(WEBUI_OUT_LIB_NAME)-static_d.a
 
 # Platform defaults and dynamic library outputs
 ifeq ($(DETECTED_OS),Windows)
@@ -153,13 +157,20 @@ ifeq ($(DETECTED_OS),Darwin)
 	&& echo "Build WebUI Objective-C WKWebKit ($(CC) $(TARGET) release)..." \
 	&& $(CC) $(TARGET) $(WKWEBKIT_BUILD_FLAGS) -Os
 endif
-#	Static Release
+#	Static Release (Normal)
 	@cd "$(BUILD_DIR)" \
 	&& echo "Build WebUI library ($(CC) $(TARGET) release static)..." \
 	&& $(CC) $(TARGET) $(CIVETWEB_BUILD_FLAGS) $(CIVETWEB_DEFINE_FLAGS) -Os \
 	&& $(CC) $(TARGET) $(WEBUI_BUILD_FLAGS) $(WARNING_RELEASE) -Os \
 	&& $(LLVM_OPT)ar rc $(LIB_STATIC_OUT) webui.o civetweb.o $(WEBKIT_OBJ) \
 	&& $(LLVM_OPT)ranlib $(LIB_STATIC_OUT)
+#	Static Release with DevTools
+	@cd "$(BUILD_DIR)" \
+	&& echo "Build WebUI library ($(CC) $(TARGET) release static with devtools)..." \
+	&& $(CC) $(TARGET) $(CIVETWEB_BUILD_FLAGS_DEVTOOLS) $(CIVETWEB_DEFINE_FLAGS_DEVTOOLS) -Os \
+	&& $(CC) $(TARGET) $(WEBUI_BUILD_FLAGS_DEVTOOLS) $(WARNING_RELEASE) -Os \
+	&& $(LLVM_OPT)ar rc $(LIB_STATIC_DEBUG_OUT) webui_devtools.o civetweb_devtools.o $(WEBKIT_OBJ) \
+	&& $(LLVM_OPT)ranlib $(LIB_STATIC_DEBUG_OUT)
 #	Dynamic Release
 	@cd "$(BUILD_DIR)" \
 	&& echo "Build WebUI library ($(CC) $(TARGET) release dynamic)..." \
