@@ -309,26 +309,38 @@ class WebuiBridge {
 		}
 	}
 	#getDataStrFromPacket(buffer: Uint8Array, startIndex: number): string {
-		let stringBytes: number[] = [];
-		for (let i = startIndex; i < buffer.length; i++) {
-			if (buffer[i] === 0) {
-				// Check for null byte
-				break;
+		try {
+			let stringBytes: number[] = [];
+			const maxStringLength = 65536; // Prevent memory overflow attacks
+			for (let i = startIndex; i < buffer.length && stringBytes.length < maxStringLength; i++) {
+				if (buffer[i] === 0) {
+					// Check for null byte
+					break;
+				}
+				stringBytes.push(buffer[i]);
 			}
-			stringBytes.push(buffer[i]);
+			// Convert the array of bytes to a string
+			const stringText = new TextDecoder().decode(new Uint8Array(stringBytes));
+			return stringText;
+		} catch (e) {
+			if (this.#log) console.error('WebUI -> Error in getDataStrFromPacket:', e);
+			return '';
 		}
-		// Convert the array of bytes to a string
-		const stringText = new TextDecoder().decode(new Uint8Array(stringBytes));
-		return stringText;
 	}
 	#getID(buffer: Uint8Array, index: number): number {
-		if (index < 0 || index >= buffer.length - 1) {
-			throw new Error('Index out of bounds or insufficient data.');
+		try {
+			if (index < 0 || index >= buffer.length - 1) {
+				if (this.#log) console.error(`WebUI -> getID index out of bounds: ${index}, buffer length: ${buffer.length}`);
+				return 0;
+			}
+			const firstByte = buffer[index];
+			const secondByte = buffer[index + 1];
+			const combined = (secondByte << 8) | firstByte; // Works only for little-endian
+			return combined;
+		} catch (e) {
+			if (this.#log) console.error('WebUI -> Error in getID:', e);
+			return 0;
 		}
-		const firstByte = buffer[index];
-		const secondByte = buffer[index + 1];
-		const combined = (secondByte << 8) | firstByte; // Works only for little-endian
-		return combined;
 	}
 	#addToken(buffer: Uint8Array, value: number, index: number): void {
 		if (value < 0 || value > 0xffffffff) {
@@ -669,11 +681,17 @@ class WebuiBridge {
 		this.#isStarting = false;
 	};
 	#wsOnClose = (event: CloseEvent) => {
+		if (this.#log) console.log(`WebUI -> Connection closed. Code: ${event.code}, Reason: ${event.reason || 'Unknown'}`);
+
 		if (this.#closeReason === this.#CMD_NAVIGATION) {
 			this.#closeReason = 0;
 			if (this.#log) console.log(`WebUI -> Connection lost. Navigation to [${this.#closeValue}]`);
 			this.#allowNavigation = true;
-			globalThis.location.replace(this.#closeValue);
+			try {
+				globalThis.location.replace(this.#closeValue);
+			} catch (e) {
+				if (this.#log) console.error('WebUI -> Navigation error:', e);
+			}
 		} else {
 			if (this.#wsStayAlive) {
 				// Re-connect with exponential backoff
@@ -695,55 +713,64 @@ class WebuiBridge {
 				console.log(`WebUI -> Connection lost (${event.code})`);
 				this.#freezeUi();
 			} else {
-				// Release close
+				// Release close - delay slightly to allow error handling
 				this.#closeWindowTimer();
 			}
 		}
 		// Event Callback
 		if (this.#eventsCallback) {
-			this.#eventsCallback(this.event.DISCONNECTED);
+			try {
+				this.#eventsCallback(this.event.DISCONNECTED);
+			} catch (e) {
+				if (this.#log) console.error('WebUI -> Event callback error:', e);
+			}
 		}
 	};
 	#wsOnMessage = async (event: MessageEvent) => {
-		const buffer8 = new Uint8Array(event.data);
-		if (buffer8.length < this.#PROTOCOL_SIZE) return;
-		if (buffer8[this.#PROTOCOL_SIGN] !== this.#WEBUI_SIGNATURE) return;
-		if (this.#isTextBasedCommand(buffer8[this.#PROTOCOL_CMD])) {
-			// UTF8 Text based commands
-			const callId = this.#getID(buffer8, this.#PROTOCOL_ID);
-			// Process Command
-			switch (buffer8[this.#PROTOCOL_CMD]) {
-				case this.#CMD_JS_QUICK:
-				case this.#CMD_JS:
-					{
-						// Protocol
-						// 0: [SIGNATURE]
-						// 1: [TOKEN]
-						// 2: [ID]
-						// 3: [CMD]
-						// 4: [Script]
-						const script: string = this.#getDataStrFromPacket(buffer8, this.#PROTOCOL_DATA);
-						const scriptSanitize = script.replace(/(?:\r\n|\r|\n)/g, '\n');
-						if (this.#log) console.log(`WebUI -> CMD -> JS [${scriptSanitize}]`);
-						// Get callback result
-						let FunReturn = 'undefined';
-						let FunError = false;
-						try {
-							// Add try-catch inside the async function to catch any runtime errors
-							const safeScript = `
-								try {
-									return (${scriptSanitize})();
-								} catch (e) {
-									return e.toString();
-								}
-							`;
-							FunReturn = await AsyncFunction(safeScript)();
-						} catch (e) {
-							FunError = true;
-							FunReturn = e.message;
-							// Log the error for debugging
-							if (this.#log) console.error(`WebUI -> Script execution error:`, e);
-						}
+		try {
+			const buffer8 = new Uint8Array(event.data);
+			if (buffer8.length < this.#PROTOCOL_SIZE) return;
+			if (buffer8[this.#PROTOCOL_SIGN] !== this.#WEBUI_SIGNATURE) return;
+			if (this.#isTextBasedCommand(buffer8[this.#PROTOCOL_CMD])) {
+				// UTF8 Text based commands
+				const callId = this.#getID(buffer8, this.#PROTOCOL_ID);
+				// Process Command
+				switch (buffer8[this.#PROTOCOL_CMD]) {
+					case this.#CMD_JS_QUICK:
+					case this.#CMD_JS:
+						{
+							// Protocol
+							// 0: [SIGNATURE]
+							// 1: [TOKEN]
+							// 2: [ID]
+							// 3: [CMD]
+							// 4: [Script]
+							const script: string = this.#getDataStrFromPacket(buffer8, this.#PROTOCOL_DATA);
+							if (!script) {
+								if (this.#log) console.error('WebUI -> Empty script received');
+								return;
+							}
+							const scriptSanitize = script.replace(/(?:\r\n|\r|\n)/g, '\n');
+							if (this.#log) console.log(`WebUI -> CMD -> JS [${scriptSanitize}]`);
+							// Get callback result
+							let FunReturn = 'undefined';
+							let FunError = false;
+							try {
+								// Add try-catch inside the async function to catch any runtime errors
+								const safeScript = `
+									try {
+										return (${scriptSanitize})();
+									} catch (e) {
+										return e.toString();
+									}
+								`;
+								FunReturn = await AsyncFunction(safeScript)();
+							} catch (e) {
+								FunError = true;
+								FunReturn = e?.message || 'Unknown error';
+								// Log the error for debugging
+								if (this.#log) console.error(`WebUI -> Script execution error:`, e);
+							}
 						// Stop if this is a quick call
 						if (buffer8[this.#PROTOCOL_CMD] === this.#CMD_JS_QUICK) return;
 						// Get the call return
@@ -803,11 +830,17 @@ class WebuiBridge {
 						if (this.#log) {
 							console.log(`WebUI -> CMD -> Call Response [${callResponse}]`);
 						}
-						if (this.#callPromiseResolve[callId]) {
-							if (this.#log) {
-								console.log(`WebUI -> CMD -> Resolving Response #${callId}...`);
+						try {
+							if (this.#callPromiseResolve[callId]) {
+								if (this.#log) {
+									console.log(`WebUI -> CMD -> Resolving Response #${callId}...`);
+								}
+								this.#callPromiseResolve[callId]?.(callResponse);
+								this.#callPromiseResolve[callId] = undefined;
 							}
-							this.#callPromiseResolve[callId]?.(callResponse);
+						} catch (e) {
+							if (this.#log) console.error('WebUI -> Error resolving promise:', e);
+							// Clean up the promise to prevent memory leaks
 							this.#callPromiseResolve[callId] = undefined;
 						}
 					}
@@ -819,9 +852,15 @@ class WebuiBridge {
 					// 2: [ID]
 					// 3: [CMD]
 					// 4: [URL]
-					const url: string = this.#getDataStrFromPacket(buffer8, this.#PROTOCOL_DATA);
-					if (this.#log) console.log(`WebUI -> CMD -> Navigation [${url}]`);
-					this.#close(this.#CMD_NAVIGATION, url);
+					try {
+						const url: string = this.#getDataStrFromPacket(buffer8, this.#PROTOCOL_DATA);
+						if (this.#log) console.log(`WebUI -> CMD -> Navigation [${url}]`);
+						if (url) {
+							this.#close(this.#CMD_NAVIGATION, url);
+						}
+					} catch (e) {
+						if (this.#log) console.error('WebUI -> Navigation error:', e);
+					}
 					break;
 				case this.#CMD_WINDOW_RESIZED:
 					// Protocol
@@ -830,12 +869,16 @@ class WebuiBridge {
 					// 2: [ID]
 					// 3: [CMD]
 					// 4: [x,y,width,height]
-					const widthAndHeight: string = this.#getDataStrFromPacket(buffer8, this.#PROTOCOL_DATA);
-					const { x, y, width, height } = this.#parseDimensions(widthAndHeight);
-					// Update drag positions
-					this.#currentWindowX = x;
-					this.#currentWindowY = y;
-					if (this.#log) console.log(`WebUI -> CMD -> Window Resized [x: ${x}, y: ${y}, width: ${width}, height: ${height}]`);
+					try {
+						const widthAndHeight: string = this.#getDataStrFromPacket(buffer8, this.#PROTOCOL_DATA);
+						const { x, y, width, height } = this.#parseDimensions(widthAndHeight);
+						// Update drag positions
+						this.#currentWindowX = x;
+						this.#currentWindowY = y;
+						if (this.#log) console.log(`WebUI -> CMD -> Window Resized [x: ${x}, y: ${y}, width: ${width}, height: ${height}]`);
+					} catch (e) {
+						if (this.#log) console.error('WebUI -> Window resize error:', e);
+					}
 					break;
 				case this.#CMD_NEW_ID:
 					// Protocol
@@ -844,11 +887,17 @@ class WebuiBridge {
 					// 2: [ID]
 					// 3: [CMD]
 					// 4: [New Element]
-					const newElement: string = this.#getDataStrFromPacket(buffer8, this.#PROTOCOL_DATA);
-					if (this.#log) console.log(`WebUI -> CMD -> New Bind ID [${newElement}]`);
-					if (!this.#bindsList.includes(newElement)) this.#bindsList.push(newElement);
-					// Generate objects
-					this.#updateBindsList();
+					try {
+						const newElement: string = this.#getDataStrFromPacket(buffer8, this.#PROTOCOL_DATA);
+						if (this.#log) console.log(`WebUI -> CMD -> New Bind ID [${newElement}]`);
+						if (newElement && !this.#bindsList.includes(newElement)) {
+							this.#bindsList.push(newElement);
+						}
+						// Generate objects
+						this.#updateBindsList();
+					} catch (e) {
+						if (this.#log) console.error('WebUI -> New ID error:', e);
+					}
 					break;
 				case this.#CMD_CLOSE:
 					// Protocol
@@ -856,17 +905,21 @@ class WebuiBridge {
 					// 1: [TOKEN]
 					// 2: [ID]
 					// 3: [CMD]
-					if (this.#log) {
-						// Debug Close
-						console.log(`WebUI -> CMD -> Close`);
-						if (this.#wsIsConnected()) {
-							this.#wsStayAlive = false;
-							this.#ws.close();
+					try {
+						if (this.#log) {
+							// Debug Close
+							console.log(`WebUI -> CMD -> Close`);
+							if (this.#wsIsConnected()) {
+								this.#wsStayAlive = false;
+								this.#ws.close();
+							}
 						}
-					}
-					else {
-						// Release Close
-						globalThis.close();
+						else {
+							// Release Close
+							globalThis.close();
+						}
+					} catch (e) {
+						if (this.#log) console.error('WebUI -> Close error:', e);
 					}
 					break;
 				case this.#CMD_CHECK_TK:
@@ -914,26 +967,41 @@ class WebuiBridge {
 			}
 		} else {
 			// Raw-binary based commands
-			switch (buffer8[this.#PROTOCOL_CMD]) {
-				case this.#CMD_SEND_RAW:
-					// Protocol
-					// 0: [SIGNATURE]
-					// 1: [TOKEN]
-					// 2: [ID]
-					// 3: [CMD]
-					// 4: [Function,Null,Raw Data]
-					// Get function name
-					const functionName: string = this.#getDataStrFromPacket(buffer8, this.#PROTOCOL_DATA);
-					// Get the raw data
-					const rawDataIndex: number = this.#PROTOCOL_DATA + functionName.length + 1;
-					const rawDataSize: number = (buffer8.length - rawDataIndex) - 1;
-					const userRawData = buffer8.subarray(rawDataIndex, (rawDataIndex + rawDataSize));
-					if (this.#log) console.log(`WebUI -> CMD -> Received Raw ${rawDataSize} bytes for [${functionName}()]`);
-					// Call the user function, and pass the raw data
-					if (typeof window[functionName] === 'function') window[functionName](userRawData);
-					else await AsyncFunction(functionName + '(userRawData)')();
-					break;
+			try {
+				switch (buffer8[this.#PROTOCOL_CMD]) {
+					case this.#CMD_SEND_RAW:
+						// Protocol
+						// 0: [SIGNATURE]
+						// 1: [TOKEN]
+						// 2: [ID]
+						// 3: [CMD]
+						// 4: [Function,Null,Raw Data]
+						try {
+							// Get function name
+							const functionName: string = this.#getDataStrFromPacket(buffer8, this.#PROTOCOL_DATA);
+							// Get the raw data
+							const rawDataIndex: number = this.#PROTOCOL_DATA + functionName.length + 1;
+							const rawDataSize: number = (buffer8.length - rawDataIndex) - 1;
+							const userRawData = buffer8.subarray(rawDataIndex, (rawDataIndex + rawDataSize));
+							if (this.#log) console.log(`WebUI -> CMD -> Received Raw ${rawDataSize} bytes for [${functionName}()]`);
+							// Call the user function, and pass the raw data
+							if (typeof window[functionName] === 'function') {
+								window[functionName](userRawData);
+							} else {
+								await AsyncFunction(functionName + '(userRawData)')();
+							}
+						} catch (e) {
+							if (this.#log) console.error('WebUI -> Raw data handler error:', e);
+						}
+						break;
+				}
+			} catch (e) {
+				if (this.#log) console.error('WebUI -> Binary command handler error:', e);
 			}
+		}
+		} catch (e) {
+			// Top-level error handler for wsOnMessage
+			if (this.#log) console.error('WebUI -> Message handler error:', e);
 		}
 	};
 	// -- Public APIs --------------------------
