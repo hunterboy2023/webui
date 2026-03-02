@@ -311,7 +311,9 @@ class WebuiBridge {
 	#getDataStrFromPacket(buffer: Uint8Array, startIndex: number): string {
 		try {
 			let stringBytes: number[] = [];
-			const maxStringLength = 65536; // Prevent memory overflow attacks
+			// Use a much larger limit to support multi-packet data (up to WEBUI_MAX_BUF)
+			// 64K limit was too restrictive for large data transfers
+			const maxStringLength = 64000000; // Same as WEBUI_MAX_BUF
 			for (let i = startIndex; i < buffer.length && stringBytes.length < maxStringLength; i++) {
 				if (buffer[i] === 0) {
 					// Check for null byte
